@@ -1,0 +1,49 @@
+html, body {
+    margin: 0;
+    height: 100%;
+}
+
+#splash {
+    z-index: 10002;
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    vertical-align: middle;
+    background: url("/img/logo.svg"), #ff8d8b;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 512px auto;
+    transition: opacity 0.5s, visibility 0.5s;
+    opacity: 1;
+    visibility: visible;
+}
+
+#splash.loaded {
+    opacity: 0;
+    visibility: hidden;
+}
+
+#editor {
+    z-index: 10001;
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    background: white;
+}
+
+#container {
+    width: 100vw;
+    height: 100vh;
+    background: black;
+}
+
+#container > * {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+}
+
+.hidden {
+    visibility: hidden;
+}

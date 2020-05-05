@@ -1,0 +1,44 @@
+{
+    "version": 7,
+    "resolution": {
+        "width": 0.75,
+        "height": 0.75
+    },
+    "media": {
+        "load": {
+            "video": {
+                "facingMode": "user"
+            }
+        },
+        "initialDelay": 100
+    },
+    "subtractor": {
+        "history": 500,
+        "varThreshold": 16,
+        "detectShadows": false,
+        "learningRate": -1
+    },
+    "bodypix": {
+        "load": {
+            "architecture": "MobileNetV1",
+            "outputStride": 16,
+            "multiplier": 0.75,
+            "quantBytes": 2
+        },
+        "estimate": {
+            "internalResolution": "medium",
+            "maxDetections": 1
+        }
+    },
+    "updateFrequency": {
+        "background": {
+            "subtraction": 1,
+            "update": 10
+        },
+        "bodypix": 2
+    },
+    "stats": {
+        "show": true
+    },
+    "maxErrorCount": 180
+}

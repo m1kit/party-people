@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "module": "es6",
+    "target": "es6"
+  }
+}
