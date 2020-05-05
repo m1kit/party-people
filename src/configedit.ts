@@ -30,7 +30,7 @@ function showEditor() {
 function hideEditor() {
     config = editor.get(config);
     localStorage.setItem("config", JSON.stringify(config));
-    shown = false;
+    document.getElementById("splash").classList.remove("hidden");
     location.reload();
 }
 
