@@ -14,8 +14,8 @@ if (local !== null) {
     if (parsed.version === defaultConfig.version) config = parsed;
 }
 
-document.addEventListener('keydown', function ({ ctrlKey, code }) {
-    if (ctrlKey && code === 'KeyE') {
+document.addEventListener('keydown', function ({ ctrlKey, shiftKey, code }) {
+    if (ctrlKey && shiftKey && code === 'KeyE') {
         if (shown) hideEditor();
         else showEditor();
     }

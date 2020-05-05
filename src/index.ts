@@ -1,7 +1,7 @@
 import Stats from 'stats.js';
 const cv = require('opencv');
 const bodyPix = require('@tensorflow-models/body-pix');
-import config from './configedit';
+import config from './config';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const video = document.getElementById('video') as HTMLVideoElement;
@@ -69,14 +69,12 @@ async function loop() {
 
 let h, w;
 let pose;
-let bgSubtractor;
 let sourceCanvas: HTMLCanvasElement;
 let sourceRGBA, sourceRGB;
 let ones;
-let bgRGB;
-let fgMask255;
 let segmMask1, segmMask255, segmMaskNeg255;
-let fgSegmRGB, bgSegmRGB;
+let fgSegmRGB, fgSegmHSV, fgSegmHSVVec, fgSegmHThresholdMask1, fgSegmHThresholdMask2;
+let bgRGB;
 
 async function initCV() {
     h = Math.floor(video.videoHeight * config.resolution.height);
@@ -90,14 +88,15 @@ async function initCV() {
     sourceRGBA = new cv.Mat(h, w, cv.CV_8UC4);
     sourceRGB = new cv.Mat(h, w, cv.CV_8UC3);
     ones = new cv.Mat.ones(h, w, cv.CV_8UC1);
-    fgMask255 = new cv.Mat(h, w, cv.CV_8UC1)
-    bgRGB = new cv.Mat(h, w, cv.CV_8UC3);
-    bgSubtractor = new cv.BackgroundSubtractorMOG2(config.subtractor.history, config.subtractor.varThreshold, config.subtractor.detectShadows);
     segmMask1 = new cv.Mat(h, w, cv.CV_8UC1);
     segmMask255 = new cv.Mat(h, w, cv.CV_8UC1);
     segmMaskNeg255 = new cv.Mat(h, w, cv.CV_8UC1);
     fgSegmRGB = new cv.Mat(h, w, cv.CV_8UC3);
-    bgSegmRGB = new cv.Mat(h, w, cv.CV_8UC3);
+    fgSegmHSV = new cv.Mat(h, w, cv.CV_8UC3);
+    fgSegmHSVVec = new cv.MatVector();
+    fgSegmHThresholdMask1 = new cv.Mat(h, w, cv.CV_8UC1);
+    fgSegmHThresholdMask2 = new cv.Mat(h, w, cv.CV_8UC1);
+    bgRGB = new cv.Mat(h, w, cv.CV_8UC3);
 }
 
 async function tick() {
@@ -116,17 +115,23 @@ async function tick() {
         cv.bitwise_not(segmMask255, segmMaskNeg255);
     }
     sourceRGB.copyTo(fgSegmRGB, segmMask255);
-    //cv.bitwise_and(sourceRGB, sourceRGB, fgSegmRGB, segmMask255);
     fgSegmRGB.setTo(new cv.Scalar(0, 0, 0), segmMaskNeg255);
+
+    const d = time * config.speed.color % 180;
+    cv.cvtColor(fgSegmRGB, fgSegmHSV, cv.COLOR_RGB2HSV);
+    cv.split(fgSegmHSV, fgSegmHSVVec);
+    const fgSegmHue = fgSegmHSVVec.get(0);
+    cv.threshold(fgSegmHue, fgSegmHThresholdMask1, 179 - d, d, cv.THRESH_BINARY_INV);
+    cv.threshold(fgSegmHue, fgSegmHThresholdMask2, 179 - d, 180 - d, cv.THRESH_BINARY);
+    cv.add(fgSegmHue, fgSegmHThresholdMask1, fgSegmHue);
+    cv.subtract(fgSegmHue, fgSegmHThresholdMask2, fgSegmHue);
+    cv.merge(fgSegmHSVVec, fgSegmHSV);
+
+    cv.cvtColor(fgSegmHSV, fgSegmRGB, cv.COLOR_HSV2RGB);
+    fgSegmRGB.copyTo(sourceRGB, segmMask255);
+    cv.imshow('canvas', sourceRGB);
+
+    //cv.bitwise_and(sourceRGB, sourceRGB, fgSegmRGB, segmMask255);
     //cv.bitwise_and(sourceRGB, sourceRGB, bgSegmRGB, segmMaskNeg255);
     //bgSegmRGB.setTo(new cv.Scalar(0, 0, 0), segmMask255);
-    cv.imshow('canvas', fgSegmRGB);
-
-    // 3. Subtract background
-    /*if (time % config.updateFrequency.background.subtraction === 0) {
-        bgSubtractor.apply(sourceRGB, fgMask255, config.subtractor.learningRate);
-    }
-    if (time % config.updateFrequency.background.update === 0) {
-        bgSubtractor.getBackgroundImage(bgRGB);
-    }*/
 }

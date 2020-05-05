@@ -1,5 +1,5 @@
 {
-    "version": 7,
+    "version": 8,
     "resolution": {
         "width": 0.75,
         "height": 0.75
@@ -36,6 +36,9 @@
             "update": 10
         },
         "bodypix": 2
+    },
+    "speed": {
+        "color": 8
     },
     "stats": {
         "show": true
