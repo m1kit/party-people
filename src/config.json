@@ -1,5 +1,5 @@
 {
-    "version": 15,
+    "version": 16,
     "resolution": {
         "width": 0.75,
         "height": 0.75
@@ -39,7 +39,8 @@
     "updateFrequency": {
         "background": {
             "subtraction": 1,
-            "update": 10
+            "update": 10,
+            "inpaint": 600
         },
         "bodypix": 2
     },
@@ -53,6 +54,10 @@
     },
     "saturation": 64,
     "faceRange": 2.5,
+    "background": {
+        "mode": "image",
+        "imageURL": "/img/lisa-kessler-unsplash.jpg"
+    },
     "stats": {
         "show": true
     },

@@ -72,9 +72,9 @@ let pose;
 let sourceCanvas: HTMLCanvasElement;
 let sourceRGBA, sourceRGB;
 let ones, saturator;
-let segmMaskFg, segmMaskBg, segmMaskTransformed;
-let fgSegmRGB, fgSegmHSV, fgSegmTransformed, fgSegmHSVVec, fgSegmHThresholdMask1, fgSegmHThresholdMask2;
-let outputRGB;
+let fgSegmMask, bgSegmMask, segmMaskTransformed;
+let fgSegmRGB, fgSegmHSV, fgSegmHSVVec, fgSegmHThresholdMask1, fgSegmHThresholdMask2;
+let outputFgRGB, outputBgRGB, outputRGB;
 
 async function initCV() {
     h = Math.floor(video.videoHeight * config.resolution.height);
@@ -90,16 +90,38 @@ async function initCV() {
     ones = cv.Mat.ones(h, w, cv.CV_8UC1);
     saturator = new cv.Mat(h, w, cv.CV_8UC1);
     cv.multiply(ones, ones, saturator, config.saturation);
-    segmMaskFg = new cv.Mat(h, w, cv.CV_8UC1);
-    segmMaskBg = new cv.Mat(h, w, cv.CV_8UC1);
+    fgSegmMask = new cv.Mat(h, w, cv.CV_8UC1);
+    bgSegmMask = new cv.Mat(h, w, cv.CV_8UC1);
     segmMaskTransformed = new cv.Mat(h, w, cv.CV_8UC1);
     fgSegmRGB = new cv.Mat(h, w, cv.CV_8UC3);
     fgSegmHSV = new cv.Mat(h, w, cv.CV_8UC3);
-    fgSegmTransformed = new cv.Mat(h, w, cv.CV_8UC3);
+    outputFgRGB = new cv.Mat(h, w, cv.CV_8UC3);
+    outputBgRGB = new cv.Mat(h, w, cv.CV_8UC3);
     fgSegmHSVVec = new cv.MatVector();
     fgSegmHThresholdMask1 = new cv.Mat(h, w, cv.CV_8UC1);
     fgSegmHThresholdMask2 = new cv.Mat(h, w, cv.CV_8UC1);
     outputRGB = new cv.Mat(h, w, cv.CV_8UC3);
+    await initBackgroundImage();
+}
+
+function initBackgroundImage() {
+    if (config.background.mode !== 'image') return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const loader = new Image();
+        loader.onload = () => {
+            const imgCanvas = document.createElement('canvas');
+            imgCanvas.width = w;
+            imgCanvas.height = h;
+            const ctx = imgCanvas.getContext('2d');
+            ctx.drawImage(loader, 0, 0, w, h);
+            const mat = new cv.Mat(h, w, cv.CV_8UC4);
+            mat.data.set(ctx.getImageData(0, 0, w, h).data);
+            cv.cvtColor(mat, outputBgRGB, cv.COLOR_RGBA2RGB);
+            mat.delete();
+            resolve();
+        };
+        loader.src = config.background.imageURL;
+    });
 }
 
 function beInRange(low, x, high) {
@@ -118,16 +140,16 @@ async function tick() {
         if (time % config.updateFrequency.bodypix === 0) {
             const segment = await net.segmentPerson(sourceCanvas, config.bodypix.estimate);
             pose = segment.allPoses[0];
-            segmMaskFg.data.set(segment.data);
-            cv.multiply(segmMaskFg, ones, segmMaskFg, 255);
-            cv.bitwise_not(segmMaskFg, segmMaskBg);
+            fgSegmMask.data.set(segment.data);
+            cv.multiply(fgSegmMask, ones, fgSegmMask, 255);
+            cv.bitwise_not(fgSegmMask, bgSegmMask);
         }
         if (!pose || pose.keypoints[1].score < config.bodypix.threshold.eyes || pose.keypoints[2].score < config.bodypix.threshold.eyes) {
             cv.imshow('canvas', sourceRGB); // cannot detect eyes
             return;
         }
-        fgSegmRGB.setTo(new cv.Scalar(0, 0, 0), segmMaskBg);
-        sourceRGB.copyTo(fgSegmRGB, segmMaskFg);
+        fgSegmRGB.setTo(new cv.Scalar(0, 0, 0), bgSegmMask);
+        sourceRGB.copyTo(fgSegmRGB, fgSegmMask);
     }
 
     {// 3. Paint
@@ -145,8 +167,13 @@ async function tick() {
         cv.cvtColor(fgSegmHSV, fgSegmRGB, cv.COLOR_HSV2RGB);
     }
 
-    {// 4. Paint BG
-        sourceRGB.copyTo(outputRGB);
+    {   // 4. Paint BG
+        if (config.background.mode === 'inpaint' && time % config.updateFrequency.background.inpaint === 0) {
+            cv.inpaint(sourceRGB, fgSegmMask, outputBgRGB, 20, cv.INPAINT_NS);
+        }
+        if (config.background.mode === 'source') {
+            sourceRGB.copyTo(outputBgRGB);
+        }
     }
 
     {// 5. Make distortion
@@ -163,8 +190,8 @@ async function tick() {
         const bottomSourceRect = new cv.Rect(0, th, w, bh);
         const bottomDestRect = new cv.Rect(0, th + delta.y, w, bh - delta.y);
         const bottomSourceROI = fgSegmRGB.roi(bottomSourceRect);
-        const bottomDestROI = fgSegmTransformed.roi(bottomDestRect);
-        const bottomSourceMaskROI = segmMaskFg.roi(bottomSourceRect);
+        const bottomDestROI = outputFgRGB.roi(bottomDestRect);
+        const bottomSourceMaskROI = fgSegmMask.roi(bottomSourceRect);
         const bottomDestMaskROI = segmMaskTransformed.roi(bottomDestRect);
         const affineMat = cv.matFromArray(2, 3, cv.CV_64FC1, [1, -delta.x / bh, delta.x, 0, (bh - delta.y) / bh, 0]);
         cv.warpAffine(bottomSourceROI, bottomDestROI, affineMat, new cv.Size(w, bh - delta.y), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
@@ -179,8 +206,8 @@ async function tick() {
         const topSourceRect = new cv.Rect(Math.max(0, -delta.x), Math.max(0, -delta.y), topROISize.x, topROISize.y);
         const topDestRect = new cv.Rect(Math.max(0, delta.x), Math.max(0, delta.y), topROISize.x, topROISize.y);
         const topSourceROI = fgSegmRGB.roi(topSourceRect);
-        const topDestROI = fgSegmTransformed.roi(topDestRect);
-        const topSourceMaskROI = segmMaskFg.roi(topSourceRect);
+        const topDestROI = outputFgRGB.roi(topDestRect);
+        const topSourceMaskROI = fgSegmMask.roi(topSourceRect);
         const topDestMaskROI = segmMaskTransformed.roi(topDestRect)
         topSourceROI.copyTo(topDestROI, topSourceMaskROI);
         topSourceMaskROI.copyTo(topDestMaskROI);
@@ -191,8 +218,8 @@ async function tick() {
     }
 
     {// 6. Show
-        fgSegmTransformed.copyTo(outputRGB, segmMaskTransformed)
+        outputBgRGB.copyTo(outputRGB);
+        outputFgRGB.copyTo(outputRGB, segmMaskTransformed);
         cv.imshow('canvas', outputRGB);
     }
 }
-
