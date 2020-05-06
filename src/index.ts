@@ -145,7 +145,7 @@ async function tick() {
             cv.bitwise_not(fgSegmMask, bgSegmMask);
         }
         if (!pose || pose.keypoints[1].score < config.bodypix.threshold.eyes || pose.keypoints[2].score < config.bodypix.threshold.eyes) {
-            cv.imshow('canvas', sourceRGB); // cannot detect eyes
+            cv.imshow('canvas', outputBgRGB);
             return;
         }
         fgSegmRGB.setTo(new cv.Scalar(0, 0, 0), bgSegmMask);
