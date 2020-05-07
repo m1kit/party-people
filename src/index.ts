@@ -73,6 +73,9 @@ document.addEventListener("keydown", event => {
         party = !party;
     }
 });
+document.addEventListener("pointerdown", event => {
+    party = !party;
+})
 
 let h, w;
 let pose;
