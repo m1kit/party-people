@@ -67,7 +67,7 @@ async function loop() {
     loop();
 })();
 
-let party = false;
+let party = true;
 document.addEventListener("keydown", event => {
     if (event.code === 'Space') {
         party = !party;
